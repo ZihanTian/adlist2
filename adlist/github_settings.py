@@ -26,5 +26,14 @@
 
 # Then copy the client_key and secret to this file
 
-SOCIAL_AUTH_GITHUB_KEY = 'bebcbc74fc4224ff11da'
-SOCIAL_AUTH_GITHUB_SECRET = '8a6b248ad1c32262fd10758280fd49a14ff0ab23'
+#SOCIAL_AUTH_GITHUB_KEY = 'bebcbc74fc4224ff11da'
+#SOCIAL_AUTH_GITHUB_SECRET = '8a6b248ad1c32262fd10758280fd49a14ff0ab23'
+
+SOCIAL_AUTH_GITHUB_KEY ='7e5de7863b6f1282d67e'
+SOCIAL_AUTH_GITHUB_SECRET = 'f2ea6817be87048691c2674b0e0820c5feb23e88'
+
+# The code below dynamically switches between non-social login.html 
+# and social_login.html when we notice that social login has been
+# configured in settings.py (later in the course)
+# Or just uncomment the path above when you enable social login
+

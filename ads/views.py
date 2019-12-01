@@ -1,8 +1,9 @@
 from django.shortcuts import render
-
+from ads.utils import dump_queries
+from django.db.models import Q
 # Create your views here.
-from ads.models import Ad, Comment
-
+from ads.models import Ad, Comment, Fav
+from django.contrib.humanize.templatetags.humanize import naturaltime
 from django.views import View
 from django.views import generic
 from django.shortcuts import render, redirect, get_object_or_404
@@ -18,7 +19,47 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 class AdListView(OwnerListView):
     model = Ad
     template_name = "ads/Ad_list.html"
+   # def get(self, request) :
+   #     ad_list = Ad.objects.all()
+   #     favorites = list()
+   #     if request.user.is_authenticated:
+            # rows = [{'id': 2}, {'id': 4} ... ]  (A list of rows)
+   #         rows = request.user.favorite_ads.values('id')
+            # favorites = [2, 4, ...] using list comprehension
+   #         favorites = [ row['id'] for row in rows ]
+   #     ctx = {'ad_list' : ad_list, 'favorites': favorites}
+   #     return render(request, self.template_name, ctx)
+    def get(self, request) :
+        favorites = list()
+        strval =  request.GET.get("search", False)
+        if strval :
+            # Simple title-only search
+            # objects = Post.objects.filter(title__contains=strval).select_related().order_by('-updated_at')[:10]
 
+            # Multi-field search
+            query = Q(title__contains=strval)
+            query.add(Q(text__contains=strval), Q.OR)
+            ad_list = Ad.objects.filter(query).select_related().order_by('-updated_at')[:10]
+        else :
+            # try both versions with > 4 posts and watch the queries that happen
+            ad_list = Ad.objects.all().order_by('-updated_at')[:10]
+            # objects = Post.objects.select_related().all().order_by('-updated_at')[:10]
+
+        # Augment the post_list
+        for obj in ad_list:
+            obj.natural_updated = naturaltime(obj.updated_at)
+        if request.user.is_authenticated:
+            # rows = [{'id': 2}, {'id': 4} ... ]  (A list of rows)
+            rows = request.user.favorite_ads.values('id')
+            # favorites = [2, 4, ...] using list comprehension
+            favorites = [ row['id'] for row in rows ]
+            ctx = {'ad_list' : ad_list, 'search': strval, 'favorites': favorites }
+        else:
+            ctx = {'ad_list' : ad_list, 'search': strval}
+        retval = render(request, self.template_name, ctx)
+
+        dump_queries()
+        return retval
 class AdDetailView(OwnerDetailView):
     model = Ad
     template_name = "ads/Ad_detail.html"
@@ -28,7 +69,33 @@ class AdDetailView(OwnerDetailView):
         comment_form = CommentForm()
         context = { 'ad' : ad, 'comments': comments, 'comment_form': comment_form }
         return render(request, self.template_name, context)
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
+from django.db.utils import IntegrityError
 
+@method_decorator(csrf_exempt, name='dispatch')
+class AddFavoriteView(LoginRequiredMixin, View):
+    def post(self, request, pk) :
+        print("Add PK",pk)
+        t = get_object_or_404(Ad, id=pk)
+        fav = Fav(user=request.user, ad=t)
+        try:
+            fav.save()  # In case of duplicate key
+        except IntegrityError as e:
+            pass
+        return HttpResponse()
+
+@method_decorator(csrf_exempt, name='dispatch')
+class DeleteFavoriteView(LoginRequiredMixin, View):
+    def post(self, request, pk) :
+        print("Delete PK",pk)
+        t = get_object_or_404(Ad, id=pk)
+        try:
+            fav = Fav.objects.get(user=request.user, ad=t).delete()
+        except Fav.DoesNotExist as e:
+            pass
+
+        return HttpResponse()
 class CommentCreateView(LoginRequiredMixin, View):
     def post(self, request, pk) :
         f = get_object_or_404(Ad, id=pk)
